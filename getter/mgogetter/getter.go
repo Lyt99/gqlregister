@@ -1,8 +1,8 @@
 package mgogetter
 
 import (
+	"git.bingyan.net/lyt99/gqlregister"
 	"github.com/globalsign/mgo"
-	"gqlregister"
 	"reflect"
 )
 
