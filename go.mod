@@ -1,4 +1,4 @@
-module gqlregister
+module git.bingyan.net/lyt99/gqlregister
 
 go 1.12
 
