@@ -18,7 +18,7 @@ const TAG = "bson"
 //	Friends []Person
 // }
 // it will throw panic stack-overflow
-func BindFields(obj interface{}) graphql.Fields {
+func BindFields(obj interface{}, el map[string]*graphql.List) graphql.Fields {
 	t := reflect.TypeOf(obj)
 	v := reflect.ValueOf(obj)
 	fields := make(map[string]*graphql.Field)
@@ -44,7 +44,7 @@ func BindFields(obj interface{}) graphql.Fields {
 
 		var graphType graphql.Output
 		if fieldType.Kind() == reflect.Struct {
-			structFields := BindFields(v.Field(i).Interface())
+			structFields := BindFields(v.Field(i).Interface(), el)
 
 			if tag == "" {
 				fields = appendFields(fields, structFields)
@@ -62,7 +62,7 @@ func BindFields(obj interface{}) graphql.Fields {
 		}
 
 		if graphType == nil {
-			graphType = getGraphType(fieldType)
+			graphType = getGraphType(fieldType, el)
 		}
 		fields[tag] = &graphql.Field{
 			Type: graphType,
@@ -74,7 +74,7 @@ func BindFields(obj interface{}) graphql.Fields {
 	return fields
 }
 
-func getGraphType(tipe reflect.Type) graphql.Output {
+func getGraphType(tipe reflect.Type, el map[string]*graphql.List) graphql.Output {
 	kind := tipe.Kind()
 	switch kind {
 	case reflect.String:
@@ -86,12 +86,12 @@ func getGraphType(tipe reflect.Type) graphql.Output {
 	case reflect.Bool:
 		return graphql.Boolean
 	case reflect.Slice:
-		return getGraphList(tipe)
+		return getGraphList(tipe, el)
 	}
 	return graphql.String
 }
 
-func getGraphList(tipe reflect.Type) *graphql.List {
+func getGraphList(tipe reflect.Type, el map[string]*graphql.List) *graphql.List {
 	if tipe.Kind() == reflect.Slice {
 		switch tipe.Elem().Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int32, reflect.Int64:
@@ -107,11 +107,20 @@ func getGraphList(tipe reflect.Type) *graphql.List {
 	// finally bind object
 	t := reflect.New(tipe.Elem())
 	name := strings.Replace(fmt.Sprint(tipe.Elem()), ".", "_", -1)
+	v, ok := el[name]
+	if ok {
+		return v
+	}
+
 	obj := graphql.NewObject(graphql.ObjectConfig{
 		Name:   name,
-		Fields: BindFields(t.Elem().Interface()),
+		Fields: BindFields(t.Elem().Interface(), el),
 	})
-	return graphql.NewList(obj)
+
+	list := graphql.NewList(obj)
+
+	el[name] = list
+	return list
 }
 
 func appendFields(dest, origin graphql.Fields) graphql.Fields {
@@ -149,7 +158,7 @@ func extractTag(tag reflect.StructTag) string {
 }
 
 // lazy way of binding args
-func BindArg(obj interface{}) graphql.FieldConfigArgument {
+func BindArg(obj interface{}, el map[string]*graphql.List) graphql.FieldConfigArgument {
 	v := reflect.Indirect(reflect.ValueOf(obj))
 	var config = make(graphql.FieldConfigArgument)
 	for i := 0; i < v.NumField(); i++ {
@@ -161,7 +170,7 @@ func BindArg(obj interface{}) graphql.FieldConfigArgument {
 		}
 
 		config[mytag] = &graphql.ArgumentConfig{
-			Type: getGraphType(field.Type),
+			Type: getGraphType(field.Type, el),
 		}
 	}
 	return config

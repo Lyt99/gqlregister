@@ -35,8 +35,7 @@ type GraphqlMongoRegister struct {
 	collectionType map[string]TObjectPair
 	sessionGetter  SessionGetter
 	query          *graphql.Object
-	GraphiQL       bool
-	Pretty         bool
+	existingLists  map[string]*graphql.List
 }
 
 func New(sessionGetter SessionGetter) *GraphqlMongoRegister {
@@ -44,6 +43,7 @@ func New(sessionGetter SessionGetter) *GraphqlMongoRegister {
 		collectionType: make(map[string]TObjectPair),
 		sessionGetter:  sessionGetter,
 		query:          &graphql.Object{},
+		existingLists: make(map[string]*graphql.List),
 	}
 
 	return ret
@@ -116,11 +116,11 @@ func (m *GraphqlMongoRegister) Register(colName string, schema interface{}) (err
 		Object: graphql.NewObject(graphql.ObjectConfig{
 			Name:        colName,
 			Interfaces:  nil,
-			Fields:      BindFields(schema),
+			Fields:      BindFields(schema, m.existingLists),
 			IsTypeOf:    nil,
 			Description: fmt.Sprintf("Struct in collection %s", colName),
 		}),
-		Args: BindArg(schema),
+		Args: BindArg(schema, m.existingLists),
 	}
 
 
