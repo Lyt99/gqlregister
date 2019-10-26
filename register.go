@@ -27,9 +27,9 @@ type SessionGetter interface {
 }
 
 type TObjectPair struct {
-	T reflect.Type
+	T      reflect.Type
 	Object *graphql.Object
-	Args graphql.FieldConfigArgument
+	Args   graphql.FieldConfigArgument
 }
 type GraphqlMongoRegister struct {
 	collectionType map[string]TObjectPair
@@ -39,11 +39,11 @@ type GraphqlMongoRegister struct {
 }
 
 func New(sessionGetter SessionGetter) *GraphqlMongoRegister {
-	ret :=  &GraphqlMongoRegister{
+	ret := &GraphqlMongoRegister{
 		collectionType: make(map[string]TObjectPair),
 		sessionGetter:  sessionGetter,
 		query:          &graphql.Object{},
-		existingLists: make(map[string]*graphql.List),
+		existingLists:  make(map[string]*graphql.List),
 	}
 
 	return ret
@@ -54,13 +54,15 @@ func (m *GraphqlMongoRegister) makeQuery() {
 
 	for k, v := range m.collectionType {
 		fields[k] = &graphql.Field{
-			Name:              k,
-			Type:              graphql.NewList(v.Object),
-			Args:              v.Args,
-			Resolve: func(p graphql.ResolveParams) (i interface{}, err error) {
-				session := m.sessionGetter.GetSession()
-				return session.FindMany(k, p.Args, v.T)
-			},
+			Name: k,
+			Type: graphql.NewList(v.Object),
+			Args: v.Args,
+			Resolve: func(col string, t reflect.Type) graphql.FieldResolveFn {
+				return func(p graphql.ResolveParams) (i interface{}, err error) {
+					session := m.sessionGetter.GetSession()
+					return session.FindMany(col, p.Args, t)
+				}
+			}(k, v.T),
 			DeprecationReason: "",
 			Description:       v.Object.Description(),
 		}
@@ -112,7 +114,7 @@ func (m *GraphqlMongoRegister) Register(colName string, schema interface{}) (err
 	}
 
 	m.collectionType[colName] = TObjectPair{
-		T:      reflect.TypeOf(schema),
+		T: reflect.TypeOf(schema),
 		Object: graphql.NewObject(graphql.ObjectConfig{
 			Name:        colName,
 			Interfaces:  nil,
@@ -122,7 +124,6 @@ func (m *GraphqlMongoRegister) Register(colName string, schema interface{}) (err
 		}),
 		Args: BindArg(schema, m.existingLists),
 	}
-
 
 	return nil
 }
